@@ -1,0 +1,11 @@
+TRAIN = 'train'
+VALID = 'valid'
+LOSS = 'loss'
+
+INPUTS = 'inputs'
+LENGTHS = 'lens'
+TARGETS = 'targets'
+LOGITS = 'logits'
+PROCESSED_LOGITS = 'PROCESSED_LOGITS'
+PROCESSED_TARGETS = 'PROCESSED_TARGETS'
+SCORES = 'scores'

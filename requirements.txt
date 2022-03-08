@@ -1,0 +1,41 @@
+catalyst==21.6
+    # via -r requirements.txt
+
+scikit-learn==1.0.1
+
+clearml==1.1.5
+
+numpy==1.21.3
+    # via
+    #   -r requirements.txt
+    #   albumentations
+    #   catalyst
+    #   clearml
+    #   imageio
+    #   matplotlib
+    #   opencv-python
+    #   opencv-python-headless
+    #   pandas
+    #   pywavelets
+    #   scikit-image
+    #   scikit-learn
+    #   scipy
+    #   tensorboardx
+    #   tifffile
+    #   torchtext
+    #   torchvision
+
+pandas==1.3.2
+    # via -r requirements.txt
+
+pydantic==1.8.2
+
+torch==1.10.0
+    # via
+    #   -r requirements.txt
+    #   catalyst
+    #   timm
+    #   torchtext
+    #   torchvision
+torchtext==0.11.0
+    # via -r requirements.txt
