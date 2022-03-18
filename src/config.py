@@ -4,7 +4,7 @@ import os
 
 from pydantic import BaseModel, validator
 import pandas as pd
-from torchtext.vocab import Vocab, build_vocab_from_iterator
+import sentencepiece as sp
 import torch
 
 
@@ -47,8 +47,8 @@ class Config(BaseModel):
     device: torch.device = torch.device('cuda')
 
     datasets: tp.Optional[tp.Tuple[pd.DataFrame, pd.DataFrame]] = None
-    intent_vocab: tp.Optional[Vocab] = None
-    snippet_vocab: tp.Optional[Vocab] = None
+    intent_vocab: tp.Optional[sp.SentencePieceProcessor] = None
+    snippet_vocab: tp.Optional[sp.SentencePieceProcessor] = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -64,30 +64,9 @@ class Config(BaseModel):
 
     @validator('intent_vocab', always=True)
     def init_intent_vocab(cls, v, values):
-        df = _preprocess(values['dataset_path'], 'intent')
-        vocab: Vocab = build_vocab_from_iterator(
-            iter(df['intent']),
-            specials=[
-                values['pad_token'],
-                values['unk_token'],
-                values['start_sent'],
-                values['end_sent'],
-            ]
-        )
-        vocab.set_default_index(vocab['<unk>'])
-        return vocab
+        return sp.SentencePieceProcessor(model_file='data/for_bpe/intent.model')
 
     @validator('snippet_vocab', always=True)
     def init_snippet_vocab(cls, v, values):
-        df = _preprocess(values['dataset_path'], 'snippet')
-        vocab: Vocab = build_vocab_from_iterator(
-            iter(df['snippet']),
-            specials=[
-                values['pad_token'],
-                values['unk_token'],
-                values['start_sent'],
-                values['end_sent'],
-            ]
-        )
-        vocab.set_default_index(vocab['<unk>'])
-        return vocab
+        return sp.SentencePieceProcessor(model_file='data/for_bpe/snippet.model')
+

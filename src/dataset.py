@@ -13,8 +13,8 @@ class TextDataset(Dataset):
         self.df = df.copy()
         self.intent_vocab = config.intent_vocab
         self.snippet_vocab = config.snippet_vocab
-        self.sequence_start = self.intent_vocab([config.start_sent])
-        self.sequence_end = self.intent_vocab([config.end_sent])
+        self.sequence_start = 1
+        self.sequence_end = 2
 
     def __len__(self) -> int:
         return len(self.df)
@@ -23,11 +23,11 @@ class TextDataset(Dataset):
         intent = self.df.iloc[index, 0]
         snippet = self.df.iloc[index, 1]
 
-        intent_token_ids = self.intent_vocab(tokenize_question(intent))
-        snippet_token_ids = self.snippet_vocab(tokenize_snippet(snippet))
+        intent_token_ids = self.intent_vocab.encode(intent)
+        snippet_token_ids = self.snippet_vocab.encode(snippet)
 
-        x = self.sequence_start + intent_token_ids + self.sequence_end
-        y = snippet_token_ids + self.sequence_end
+        x = [self.sequence_start] + intent_token_ids + [self.sequence_end]
+        y = [self.sequence_start] + snippet_token_ids + [self.sequence_end]
         return x, len(x), y
 
 
