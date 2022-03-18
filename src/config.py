@@ -5,6 +5,7 @@ import os
 from pydantic import BaseModel, validator
 import pandas as pd
 from torchtext.vocab import Vocab, build_vocab_from_iterator
+import torch
 
 
 def _preprocess(dataset_filepath: str, column: str):
@@ -26,23 +27,24 @@ def _preprocess(dataset_filepath: str, column: str):
 class Config(BaseModel):
     seed: int = 25
 
-    batch_size: int = 2
+    batch_size: int = 3
     epochs: int = 10
     lr: float = 0.001
+    gradient_accumulation: int = 8
 
-    embedding_dim: int = 12
-    hidden_size: int = 10
-    num_layers: int = 1
-    dropout: float = 0.8
-    bidirectional: bool = False
+    embedding_dim: int = 150
+    hidden_size: int = 192
+    num_layers: int = 2
+    dropout: float = 0.5
+    bidirectional: bool = True
 
-    dataset_path: str = 'data/homework_data'
+    dataset_path: str = 'data/conala'
 
     start_sent: str = '<sos>'
     end_sent: str = '<eos>'
     pad_token: str = '<pad>'
     unk_token: str = '<unk>'
-    device: str = 'cpu'
+    device: torch.device = torch.device('cuda')
 
     datasets: tp.Optional[tp.Tuple[pd.DataFrame, pd.DataFrame]] = None
     intent_vocab: tp.Optional[Vocab] = None

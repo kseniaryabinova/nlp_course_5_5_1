@@ -9,7 +9,15 @@ from src.config import Config
 
 
 class Encoder(nn.Module):
-    def __init__(self, input_dim, emb_dim, enc_hid_dim, dec_hid_dim, dropout):
+    def __init__(
+        self,
+        input_dim,
+        emb_dim,
+        enc_hid_dim,
+        dec_hid_dim,
+        dropout,
+        config: Config,
+    ):
         super().__init__()
 
         self.input_dim = input_dim
@@ -20,7 +28,12 @@ class Encoder(nn.Module):
 
         self.embedding = nn.Embedding(input_dim, emb_dim)
 
-        self.rnn = nn.GRU(emb_dim, enc_hid_dim, bidirectional=True)
+        self.rnn = nn.GRU(
+            emb_dim,
+            enc_hid_dim,
+            num_layers=config.num_layers,
+            bidirectional=config.bidirectional,
+        )
 
         self.fc = nn.Linear(enc_hid_dim * 2, dec_hid_dim)
 
@@ -36,7 +49,7 @@ class Encoder(nn.Module):
 
         packed_embedded = nn.utils.rnn.pack_padded_sequence(
             embedded,
-            src_len,
+            src_len.to(torch.device('cpu')),
             # batch_first=True,
             enforce_sorted=False,
         )
@@ -123,7 +136,7 @@ class Attention(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self, output_dim, emb_dim, enc_hid_dim, dec_hid_dim, dropout,
-                 attention):
+                 attention, config: Config):
         super().__init__()
 
         self.emb_dim = emb_dim
@@ -135,7 +148,11 @@ class Decoder(nn.Module):
 
         self.embedding = nn.Embedding(output_dim, emb_dim)
 
-        self.rnn = nn.GRU((enc_hid_dim * 2) + emb_dim, dec_hid_dim)
+        self.rnn = nn.GRU(
+            (enc_hid_dim * 2) + emb_dim,
+            dec_hid_dim,
+            # bidirectional=config.bidirectional,
+        )
 
         self.out = nn.Linear((enc_hid_dim * 2) + dec_hid_dim + emb_dim,
                              output_dim)
@@ -206,6 +223,8 @@ class Seq2Seq(nn.Module):
     def __init__(self, config: Config):
         super().__init__()
 
+        self.device = config.device
+
         attn = Attention(config.hidden_size, config.hidden_size)
         self.encoder = Encoder(
             len(config.intent_vocab.vocab),
@@ -213,6 +232,7 @@ class Seq2Seq(nn.Module):
             config.hidden_size,
             config.hidden_size,
             config.dropout,
+            config,
         )
         self.decoder = Decoder(
             len(config.snippet_vocab.vocab),
@@ -221,6 +241,7 @@ class Seq2Seq(nn.Module):
             config.hidden_size,
             config.dropout,
             attn,
+            config,
         )
 
         self.pad_idx = config.intent_vocab([config.pad_token])[0]
@@ -238,6 +259,9 @@ class Seq2Seq(nn.Module):
     ) -> torch.Tensor:
 
         src, src_len, trg = data
+        src = src.to(self.device)
+        src_len = src_len.to(self.device)
+        trg = trg.to(self.device)
         teacher_forcing_ratio = 0.5
 
         # src = [src sent len, batch size]
@@ -289,38 +313,3 @@ class Seq2Seq(nn.Module):
                 return outputs[:t]
 
         return outputs
-
-
-class Model(nn.Module):
-    def __init__(self, config: Config):
-        super().__init__()
-        self.config = config
-
-        self.embedding = nn.Embedding(
-            num_embeddings=len(config.intent_vocab),
-            embedding_dim=config.embedding_dim,
-            padding_idx=config.intent_vocab.get_default_index(),
-        )
-        self.encoder = nn.Sequential(
-            nn.GRU(
-                input_size=config.embedding_dim,
-                hidden_size=config.hidden_size,
-                num_layers=config.num_layers,
-                bias=True,
-                batch_first=True,
-                dropout=config.dropout,
-                bidirectional=config.bidirectional,
-            ),
-        )
-        self.head = nn.Linear(
-            in_features=config.hidden_size,
-            out_features=len(config.vocab),
-            bias=True,
-        )
-
-    def forward(self, x: Tensor) -> Tensor:
-        x = self.embedding(x)
-        x = self.backbone(x)[0]
-        x = self.head(x)
-        x = torch.permute(x, (0, 2, 1))
-        return x

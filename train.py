@@ -1,18 +1,20 @@
 from collections import OrderedDict
 
 from catalyst import dl
+from catalyst.contrib.nn import FocalLossMultiClass
 from catalyst.runners import SupervisedRunner
 from catalyst.utils import set_global_seed
 from clearml import Task
 from torch.nn import CrossEntropyLoss
-from torch.optim import Adam
+from torch.optim import Adam, AdamW
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from src.config import Config
 from src.const import INPUTS, TARGETS, LOGITS, TRAIN, VALID, LOSS, \
     PROCESSED_LOGITS, PROCESSED_TARGETS
 from src.dataset import get_dataloaders
 from src.model import Seq2Seq
-from src.train_utils import init_weights
+from src.train_utils import init_weights, FocalLoss
 
 if __name__ == '__main__':
     task = Task.init(
@@ -27,8 +29,9 @@ if __name__ == '__main__':
     train_dataloader, valid_dataloader = get_dataloaders(config)
     batch = next(iter(train_dataloader))
 
-    model = Seq2Seq(config).to(config.device)
+    model = Seq2Seq(config)
     model.apply(init_weights)
+    model = model.to(config.device)
 
     pad_index = config.intent_vocab([config.pad_token])[0]
 
@@ -57,8 +60,10 @@ if __name__ == '__main__':
             target_key=PROCESSED_TARGETS,
             metric_key=LOSS,
         ),
+
         dl.OptimizerCallback(
             metric_key=LOSS,
+            accumulation_steps=config.gradient_accumulation,
         ),
         dl.CheckpointCallback(
             logdir='checkpoints',
@@ -69,11 +74,14 @@ if __name__ == '__main__':
         )
     ]
 
+    loss = FocalLoss(pad_index=pad_index)
+    # loss = CrossEntropyLoss(ignore_index=pad_index)
+
     runner.train(
         loaders=OrderedDict({TRAIN: train_dataloader, VALID: valid_dataloader}),
         model=model,
-        criterion=CrossEntropyLoss(ignore_index=pad_index),
-        optimizer=Adam(lr=config.lr, params=model.parameters()),
+        criterion=loss,
+        optimizer=AdamW(lr=config.lr, params=model.parameters()),
         callbacks=callbacks,
         seed=config.seed,
         num_epochs=config.epochs,
@@ -81,6 +89,6 @@ if __name__ == '__main__':
         valid_loader=VALID,
         minimize_valid_metric=True,
         verbose=True,
-        check=True,
-        amp=True,
+        check=False,
+        amp=False,
     )
