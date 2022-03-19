@@ -9,43 +9,27 @@ import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
-def _preprocess(dataset_filepath: str, column: str):
-    df = pd.concat([
-        pd.read_csv(os.path.join(dataset_filepath, 'train.csv')),
-        pd.read_csv(os.path.join(dataset_filepath, 'valid.csv')),
-        pd.read_csv(os.path.join(dataset_filepath, 'test.csv')),
-    ])
-    df[column] = df[column].str.lower()
-    if column == 'intent':
-        df[column] = df[column].apply(lambda x: list(re.findall(r"[\w']+", x)))
-    elif column == 'snippet':
-        df[column] = df[column].apply(lambda x: list(
-            re.findall(r"[\w']+|[.,!?;:@~(){}\[\]+-/=\\\'\"\`]", x),
-        ))
-    return df
-
-
 class Config(BaseModel):
     seed: int = 25
 
-    batch_size: int = 24
-    epochs: int = 40
-    lr: float = 1e-3
-    gradient_accumulation: int = 3
+    batch_size: int = 64
+    epochs: int = 50
+    lr: float = 1e-2
+    gradient_accumulation: int = 4
 
     scheduler: tp.Any = CosineAnnealingLR
     scheduler_kwargs: tp.Mapping = {
-        'T_max': 10,
-        'eta_min': 1e-5,
+        'T_max': 5,
+        'eta_min': 1e-4,
     }
 
-    embedding_dim: int = 150
-    hidden_size: int = 192
+    embedding_dim: int = 300
+    hidden_size: int = 256
     num_layers: int = 4
     dropout: float = 0.5
     bidirectional: bool = True
     label_smoothing: float = 0.0
-    teacher_forcing_ratio: float = 0.5
+    teacher_forcing_ratio: float = 0.6
 
     dataset_path: str = 'data/conala'
 
@@ -62,9 +46,19 @@ class Config(BaseModel):
 
     @validator('datasets', always=True)
     def init_dataset(cls, v, values):
-        train_df = pd.concat([
-            pd.read_csv(os.path.join(values['dataset_path'], 'train.csv')),
-            pd.read_csv(os.path.join(values['dataset_path'], 'valid.csv')),
-        ])
+        dirty_df = pd.read_csv('data/homework_data/train.csv')
+        dirty_df = dirty_df[
+            dirty_df['intent'].str.contains('[P|p]ython', regex=True) &
+            (dirty_df['snippet'].apply(len) < 80)
+        ]
+
+        train_df = pd.concat(
+            [
+                pd.read_csv(os.path.join(values['dataset_path'], 'train.csv')),
+                pd.read_csv(os.path.join(values['dataset_path'], 'valid.csv')),
+                dirty_df[:2000],
+            ],
+            ignore_index=True,
+        )
         valid_df = pd.read_csv(os.path.join(values['dataset_path'], 'test.csv'))
         return train_df, valid_df
