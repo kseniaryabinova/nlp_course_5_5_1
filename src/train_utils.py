@@ -18,6 +18,7 @@ class FocalLoss(nn.Module):
         alpha=0.25,
         gamma=2.,
         reduction: str = 'mean',
+        label_smoothing: float = 0.0,
     ):
         super().__init__()
         self.alpha = alpha
@@ -26,6 +27,7 @@ class FocalLoss(nn.Module):
         self.criterion = CrossEntropyLoss(
             reduction='none',
             ignore_index=pad_index,
+            label_smoothing=label_smoothing,
         )
 
     def forward(

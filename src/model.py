@@ -227,7 +227,7 @@ class Seq2Seq(nn.Module):
 
         attn = Attention(config.hidden_size, config.hidden_size)
         self.encoder = Encoder(
-            len(config.intent_vocab.vocab),
+            len(config.intent_vocab),
             config.embedding_dim,
             config.hidden_size,
             config.hidden_size,
@@ -235,7 +235,7 @@ class Seq2Seq(nn.Module):
             config,
         )
         self.decoder = Decoder(
-            len(config.snippet_vocab.vocab),
+            len(config.snippet_vocab),
             config.embedding_dim,
             config.hidden_size,
             config.hidden_size,
@@ -244,10 +244,11 @@ class Seq2Seq(nn.Module):
             config,
         )
 
-        self.pad_idx = config.intent_vocab([config.pad_token])[0]
-        self.sos_idx = config.intent_vocab([config.start_sent])[0]
-        self.eos_idx = config.intent_vocab([config.end_sent])[0]
+        self.pad_idx = 0
+        self.sos_idx = 1
+        self.eos_idx = 2
         self.device = torch.device(config.device)
+        self.teacher_forcing_ratio = config.teacher_forcing_ratio
 
     def create_mask(self, src):
         mask = src != self.pad_idx
@@ -262,7 +263,6 @@ class Seq2Seq(nn.Module):
         src = src.to(self.device)
         src_len = src_len.to(self.device)
         trg = trg.to(self.device)
-        teacher_forcing_ratio = 0.5
 
         # src = [src sent len, batch size]
         # src_len = [batch size]
@@ -270,8 +270,8 @@ class Seq2Seq(nn.Module):
         # teacher_forcing_ratio is probability to use teacher forcing
         # e.g. if teacher_forcing_ratio is 0.75 we use teacher forcing 75% of the time
 
-        if trg is None:
-            assert teacher_forcing_ratio == 0, "Must be zero during inference"
+        if self.teacher_forcing_ratio == 0:
+            assert self.teacher_forcing_ratio == 0, "Must be zero during inference"
             inference = True
             trg = torch.zeros((100, src.shape[1])).long().fill_(
                 self.sos_idx).to(src.device)
@@ -302,11 +302,15 @@ class Seq2Seq(nn.Module):
         # mask = [batch size, src sent len]
 
         for t in range(1, max_len):
-            output, hidden, attention = self.decoder(output, hidden,
-                                                     encoder_outputs, mask)
+            output, hidden, attention = self.decoder(
+                output,
+                hidden,
+                encoder_outputs,
+                mask,
+            )
             outputs[t] = output
             attentions[t] = attention
-            teacher_force = random.random() < teacher_forcing_ratio
+            teacher_force = random.random() < self.teacher_forcing_ratio
             top1 = output.max(1)[1]
             output = (trg[t] if teacher_force else top1)
             if inference and output.item() == self.eos_idx:

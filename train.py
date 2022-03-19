@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import shutil
 
 from catalyst import dl
 from catalyst.contrib.nn import FocalLossMultiClass
@@ -33,7 +34,7 @@ if __name__ == '__main__':
     model.apply(init_weights)
     model = model.to(config.device)
 
-    pad_index = config.intent_vocab([config.pad_token])[0]
+    pad_index = 0
 
     runner = SupervisedRunner(
         model=model,
@@ -74,14 +75,20 @@ if __name__ == '__main__':
         )
     ]
 
-    loss = FocalLoss(pad_index=pad_index)
+    loss = FocalLoss(
+        pad_index=pad_index,
+        label_smoothing=config.label_smoothing,
+    )
     # loss = CrossEntropyLoss(ignore_index=pad_index)
+    optimizer = AdamW(lr=config.lr, params=model.parameters())
+    scheduler = config.scheduler(optimizer=optimizer, **config.scheduler_kwargs)
 
     runner.train(
         loaders=OrderedDict({TRAIN: train_dataloader, VALID: valid_dataloader}),
         model=model,
         criterion=loss,
-        optimizer=AdamW(lr=config.lr, params=model.parameters()),
+        optimizer=optimizer,
+        scheduler=scheduler,
         callbacks=callbacks,
         seed=config.seed,
         num_epochs=config.epochs,
@@ -91,4 +98,9 @@ if __name__ == '__main__':
         verbose=True,
         check=False,
         amp=False,
+    )
+
+    shutil.copy(
+        '/root/.clearml/venvs-builds/3.7/task_repository/nlp_course_5_5_1.git/checkpoints/best.pth',
+        '/tmp/best.pth',
     )

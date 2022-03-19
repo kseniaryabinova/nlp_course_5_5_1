@@ -31,27 +31,6 @@ class TextDataset(Dataset):
         return x, len(x), y
 
 
-def tokenize_question(text):
-    """
-    Tokenizes question from a string into a list of strings (tokens)
-    """
-    text = text.lower()
-    return list(
-        filter(lambda x: len(x) < 16, re.findall(r"[\w']+", text)),
-    )
-
-
-def tokenize_snippet(text):
-    """
-    Tokenizes code snippet into a list of operands.
-    """
-    text = text.lower()
-    return list(filter(
-        lambda x: len(x) < 10,
-        re.findall(r"[\w']+|[.,!?;:@~(){}\[\]+-/=\\\'\"\`]", text),
-    ))
-
-
 def get_datasets(config: Config):
     train_dataset = TextDataset(config.datasets[0], config)
     valid_dataset = TextDataset(config.datasets[1], config)
@@ -60,7 +39,7 @@ def get_datasets(config: Config):
 
 def get_dataloaders(config: Config):
     train_dataset, valid_dataset = get_datasets(config)
-    pad_token_id = config.intent_vocab([config.pad_token])
+    pad_token_id = 0
 
     train_dataloader = DataLoader(
         dataset=train_dataset,
@@ -84,9 +63,10 @@ def collate_fn(batch, pad_token_id):
     padded_x = []
     padded_y = []
     input_lens = []
+
     for x, lens, y in batch:
-        padded_x.append(x + pad_token_id * (intent_max_len - len(x)))
-        padded_y.append(y + pad_token_id * (snippet_max_len - len(y)))
+        padded_x.append(x + [pad_token_id] * (intent_max_len - len(x)))
+        padded_y.append(y + [pad_token_id] * (snippet_max_len - len(y)))
         input_lens.append(lens)
 
     return {

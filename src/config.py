@@ -6,6 +6,7 @@ from pydantic import BaseModel, validator
 import pandas as pd
 import sentencepiece as sp
 import torch
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
 def _preprocess(dataset_filepath: str, column: str):
@@ -27,28 +28,34 @@ def _preprocess(dataset_filepath: str, column: str):
 class Config(BaseModel):
     seed: int = 25
 
-    batch_size: int = 3
-    epochs: int = 10
-    lr: float = 0.001
-    gradient_accumulation: int = 8
+    batch_size: int = 24
+    epochs: int = 40
+    lr: float = 1e-3
+    gradient_accumulation: int = 3
+
+    scheduler: tp.Any = CosineAnnealingLR
+    scheduler_kwargs: tp.Mapping = {
+        'T_max': 10,
+        'eta_min': 1e-5,
+    }
 
     embedding_dim: int = 150
     hidden_size: int = 192
-    num_layers: int = 2
+    num_layers: int = 4
     dropout: float = 0.5
     bidirectional: bool = True
+    label_smoothing: float = 0.0
+    teacher_forcing_ratio: float = 0.5
 
     dataset_path: str = 'data/conala'
 
-    start_sent: str = '<sos>'
-    end_sent: str = '<eos>'
-    pad_token: str = '<pad>'
-    unk_token: str = '<unk>'
+    start_sent: str = '<s>'
+    end_sent: str = '</s>'
     device: torch.device = torch.device('cuda')
 
     datasets: tp.Optional[tp.Tuple[pd.DataFrame, pd.DataFrame]] = None
-    intent_vocab: tp.Optional[sp.SentencePieceProcessor] = None
-    snippet_vocab: tp.Optional[sp.SentencePieceProcessor] = None
+    intent_vocab: tp.Optional[sp.SentencePieceProcessor] = sp.SentencePieceProcessor(model_file='data/for_bpe/intent.model')
+    snippet_vocab: tp.Optional[sp.SentencePieceProcessor] = sp.SentencePieceProcessor(model_file='data/for_bpe/snippet.model')
 
     class Config:
         arbitrary_types_allowed = True
@@ -61,12 +68,3 @@ class Config(BaseModel):
         ])
         valid_df = pd.read_csv(os.path.join(values['dataset_path'], 'test.csv'))
         return train_df, valid_df
-
-    @validator('intent_vocab', always=True)
-    def init_intent_vocab(cls, v, values):
-        return sp.SentencePieceProcessor(model_file='data/for_bpe/intent.model')
-
-    @validator('snippet_vocab', always=True)
-    def init_snippet_vocab(cls, v, values):
-        return sp.SentencePieceProcessor(model_file='data/for_bpe/snippet.model')
-
